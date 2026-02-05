@@ -32,6 +32,7 @@ const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', () => {
   console.log('Connected to MongoDB');
+  initializeDefaultCategories();
 });
 
 // Import Models
@@ -783,10 +784,6 @@ async function initializeDefaultCategories() {
   }
 }
 
-// Initialize categories on startup
-initializeDefaultCategories();
-
-// Start server
 // Start server
 const PORT = process.env.PORT || 5001;
 
