@@ -20,7 +20,9 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/trainerpoll', {
+const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/trainerpoll';
+console.log('Attempting to connect to DB at:', dbUri.startsWith('mongodb+srv') ? 'Remote MongoDB Cluster (Correct)' : 'Localhost (Wrong - Env Var Not Set)');
+mongoose.connect(dbUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 30000,
