@@ -1,0 +1,135 @@
+
+// ==================== CATEGORY MANAGEMENT ====================
+
+// Show Category Management Screen
+async function showCategoryManagement() {
+    const root = document.getElementById('root');
+    root.innerHTML = `
+        <div class="container">
+            <div class="admin-header">
+                <h1>⚙️ Category Management</h1>
+                <button onclick="showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
+            </div>
+            
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Add New Category</h3>
+                <form id="addCategoryForm" style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="categoryName">Category Name</label>
+                        <input type="text" id="categoryName" placeholder="Enter category name" required>
+                    </div>
+                    <button type="submit" style="background: #27ae60; width: auto;">Add Category</button>
+                </form>
+            </div>
+            
+            <div id="categoriesList"></div>
+        </div>
+    `;
+    
+    document.getElementById('addCategoryForm').addEventListener('submit', handleAddCategory);
+    loadCategories();
+}
+
+async function loadCategories() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        const categories = await response.json();
+        const container = document.getElementById('categoriesList');
+        
+        if (categories.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666;">No categories found.</p>';
+            return;
+        }
+        
+        container.innerHTML = categories.map(category => `
+            <div style="background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0;">${category.name}</h3>
+                    <small style="color: #666;">ID: ${category._id}</small>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="editCategory('${category._id}', '${category.name.replace(/'/g, "\\'")}')" style="background: #3498db;">Edit</button>
+                    <button onclick="deleteCategory('${category._id}', '${category.name.replace(/'/g, "\\'")}')" style="background: #e74c3c;">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading categories:', error);
+    }
+}
+
+async function handleAddCategory(e) {
+    e.preventDefault();
+    const name = document.getElementById('categoryName').value;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAdminToken}`
+            },
+            body: JSON.stringify({ name })
+        });
+        
+        if (response.ok) {
+            alert('Category added successfully!');
+            document.getElementById('categoryName').value = '';
+            loadCategories();
+        } else {
+            const result = await response.json();
+            alert(result.error || 'Error adding category');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function editCategory(categoryId, currentName) {
+    const newName = prompt('Enter new category name:', currentName);
+    if (!newName || newName === currentName) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAdminToken}`
+            },
+            body: JSON.stringify({ name: newName })
+        });
+        
+        if (response.ok) {
+            alert('Category updated successfully!');
+            loadCategories();
+        } else {
+            alert('Error updating category');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteCategory(categoryId, categoryName) {
+    if (!confirm(`Are you sure you want to delete category "${categoryName}"?\n\nWarning: Questions using this category will still keep the category name.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${currentAdminToken}`
+            }
+        });
+        
+        if (response.ok) {
+            alert('Category deleted successfully!');
+            loadCategories();
+        } else {
+            alert('Error deleting category');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}

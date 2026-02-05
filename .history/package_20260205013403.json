@@ -1,0 +1,15 @@
+{
+  "name": "quizamit",
+  "version": "1.0.0",
+  "description": "Live Quiz and Poll Platform",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm start",
+    "client": "cd frontend && npm start",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\""
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}

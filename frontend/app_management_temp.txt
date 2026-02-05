@@ -1,0 +1,414 @@
+
+// ==================== MANAGEMENT FUNCTIONS ====================
+
+// Question Management Screen
+async function showQuestionManagement() {
+    const root = document.getElementById('root');
+    root.innerHTML = `
+        <div class="container">
+            <h1>Question Management</h1>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px;">
+                <input type="text" id="searchQuestion" placeholder="Search questions..." style="flex: 1; padding: 8px;">
+                <select id="filterCategory" onchange="loadAllQuestions()" style="padding: 8px;">
+                    <option value="all">All Categories</option>
+                    <option value="General">General</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Leadership">Leadership</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Product Knowledge">Product Knowledge</option>
+                    <option value="Customer Service">Customer Service</option>
+                    <option value="HR & Compliance">HR & Compliance</option>
+                </select>
+                <button onclick="loadAllQuestions()" style="background: #3498db;">Search</button>
+            </div>
+            
+            <div id="questionManagementList"></div>
+            <button onclick="showAdminDashboard()" style="background: #95a5a6; margin-top: 20px;">Back</button>
+        </div>
+    `;
+    
+    loadAllQuestions();
+    
+    // Add search on enter
+    document.getElementById('searchQuestion').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') loadAllQuestions();
+    });
+}
+
+async function loadAllQuestions() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions`);
+        let questions = await response.json();
+        const container = document.getElementById('questionManagementList');
+        
+        // Apply filters
+        const searchTerm = document.getElementById('searchQuestion')?.value.toLowerCase();
+        const categoryFilter = document.getElementById('filterCategory')?.value;
+        
+        if (searchTerm) {
+            questions = questions.filter(q => q.text.toLowerCase().includes(searchTerm));
+        }
+        
+        if (categoryFilter && categoryFilter !== 'all') {
+            questions = questions.filter(q => (q.category || 'General') === categoryFilter);
+        }
+        
+        if (questions.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666;">No questions found.</p>';
+            return;
+        }
+        
+        container.innerHTML = questions.map(q => `
+            <div style="background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #667eea;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 10px 0;">${q.text}</h3>
+                        <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                            <small style="color: #666;"><strong>Category:</strong> ${q.category || 'General'}</small>
+                            <small style="color: #666;"><strong>Type:</strong> ${q.type}</small>
+                            <small style="color: #666;"><strong>Points:</strong> ${q.points}</small>
+                            <small style="color: #666;"><strong>Times Launched:</strong> ${q.timesLaunched || 0}</small>
+                        </div>
+                        ${q.options && q.options.length > 0 ? `
+                            <div style="margin-top: 10px;">
+                                <small style="color: #666;"><strong>Options:</strong></small>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    ${q.options.map(opt => `<li>${opt} ${q.correctAnswer === opt ? '✓ (Correct)' : ''}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="editQuestion('${q._id}')" style="background: #3498db;">Edit</button>
+                        <button onclick="deleteQuestionFromManagement('${q._id}', '${q.text.replace(/'/g, "\\'")}')" style="background: #e74c3c;">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading questions:', error);
+    }
+}
+
+async function editQuestion(questionId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions/${questionId}`);
+        const question = await response.json();
+        
+        const root = document.getElementById('root');
+        root.innerHTML = `
+            <div class="container">
+                <h1>Edit Question</h1>
+                <form id="editQuestionForm">
+                    <div class="form-group">
+                        <label for="editCategory">Question Category</label>
+                        <select id="editCategory">
+                            <option value="General">General</option>
+                            <option value="Sales">Sales</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Leadership">Leadership</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Product Knowledge">Product Knowledge</option>
+                            <option value="Customer Service">Customer Service</option>
+                            <option value="HR & Compliance">HR & Compliance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editType">Question Type</label>
+                        <select id="editType" required>
+                            <option value="MCQ">Multiple Choice</option>
+                            <option value="True/False">True/False</option>
+                            <option value="Poll">Poll</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editText">Question</label>
+                        <textarea id="editText" required style="height: 80px;"></textarea>
+                    </div>
+                    <div id="editOptionsDiv"></div>
+                    <button type="submit">Update Question</button>
+                    <button type="button" onclick="showQuestionManagement()" style="background: #95a5a6; margin-left: 10px;">Cancel</button>
+                </form>
+            </div>
+        `;
+        
+        // Populate form
+        document.getElementById('editCategory').value = question.category || 'General';
+        document.getElementById('editType').value = question.type;
+        document.getElementById('editText').value = question.text;
+        
+        // Setup type change listener
+        document.getElementById('editType').addEventListener('change', updateEditQuestionForm);
+        document.getElementById('editQuestionForm').addEventListener('submit', (e) => handleEditQuestion(e, questionId));
+        
+        // Initial form update
+        updateEditQuestionForm(question);
+    } catch (error) {
+        alert('Error loading question: ' + error.message);
+    }
+}
+
+function updateEditQuestionForm(existingQuestion = null) {
+    const type = document.getElementById('editType').value;
+    const optionsDiv = document.getElementById('editOptionsDiv');
+    
+    let html = '';
+    if (type === 'MCQ') {
+        const optionsValue = existingQuestion?.options ? existingQuestion.options.join('\n') : '';
+        html = `
+            <div class="form-group">
+                <label for="editOptions">Options (one per line)</label>
+                <textarea id="editOptions" required style="height: 100px;">${optionsValue}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="editCorrectAnswer">Correct Answer</label>
+                <select id="editCorrectAnswer" required>
+                    <option value="">Select correct answer</option>
+                </select>
+            </div>
+        `;
+    } else if (type === 'Poll') {
+        const optionsValue = existingQuestion?.options ? existingQuestion.options.join('\n') : '';
+        html = `
+            <div class="form-group">
+                <label for="editOptions">Options (one per line)</label>
+                <textarea id="editOptions" required style="height: 100px;">${optionsValue}</textarea>
+            </div>
+        `;
+    } else if (type === 'True/False') {
+        html = `
+            <div class="form-group">
+                <label for="editCorrectAnswer">Correct Answer</label>
+                <select id="editCorrectAnswer" required>
+                    <option value="">Select correct answer</option>
+                    <option value="True">True</option>
+                    <option value="False">False</option>
+                </select>
+            </div>
+        `;
+    }
+    
+    optionsDiv.innerHTML = html;
+    
+    // If MCQ, setup options update listener
+    if (type === 'MCQ') {
+        const optionsTextarea = document.getElementById('editOptions');
+        const correctAnswerSelect = document.getElementById('editCorrectAnswer');
+        
+        // Update dropdown with options
+        const updateDropdown = () => {
+            const currentValue = correctAnswerSelect.value;
+            const options = optionsTextarea.value.split('\n').map(o => o.trim()).filter(o => o);
+            
+            correctAnswerSelect.innerHTML = '<option value="">Select correct answer</option>';
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                correctAnswerSelect.appendChild(opt);
+            });
+            
+            if (existingQuestion?.correctAnswer) {
+                correctAnswerSelect.value = existingQuestion.correctAnswer;
+            } else {
+                correctAnswerSelect.value = currentValue;
+            }
+        };
+        
+        updateDropdown();
+        optionsTextarea.addEventListener('input', updateDropdown);
+    } else if (type === 'True/False' && existingQuestion?.correctAnswer) {
+        setTimeout(() => {
+            document.getElementById('editCorrectAnswer').value = existingQuestion.correctAnswer;
+        }, 0);
+    }
+}
+
+async function handleEditQuestion(e, questionId) {
+    e.preventDefault();
+    
+    const text = document.getElementById('editText').value;
+    const type = document.getElementById('editType').value;
+    const category = document.getElementById('editCategory').value;
+    const correctAnswer = document.getElementById('editCorrectAnswer')?.value || '';
+    const optionsText = document.getElementById('editOptions')?.value || '';
+    const options = optionsText ? optionsText.split('\n').map(o => o.trim()).filter(o => o) : [];
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAdminToken}`
+            },
+            body: JSON.stringify({ text, type, category, options, correctAnswer, points: 10 })
+        });
+        
+        if (response.ok) {
+            alert('Question updated successfully!');
+            showQuestionManagement();
+        } else {
+            alert('Error updating question');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteQuestionFromManagement(questionId, questionText) {
+    if (!confirm(`Are you sure you want to delete this question?\n\n"${questionText}"`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${currentAdminToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('Question deleted successfully!');
+            loadAllQuestions();
+        } else {
+            alert(result.error || 'Error deleting question');
+        }
+    } catch (error) {
+        alert('Error deleting question: ' + error.message);
+    }
+}
+
+// Reporting Manager Management Screen
+async function showManagerManagement() {
+    const root = document.getElementById('root');
+    root.innerHTML = `
+        <div class="container">
+            <h1>Reporting Manager Management</h1>
+            
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Add New Manager</h3>
+                <form id="addManagerForm" style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="managerName">Manager Name</label>
+                        <input type="text" id="managerName" placeholder="Enter manager name" required>
+                    </div>
+                    <button type="submit" style="background: #27ae60;">Add Manager</button>
+                </form>
+            </div>
+            
+            <div id="managersList"></div>
+            <button onclick="showAdminDashboard()" style="background: #95a5a6; margin-top: 20px;">Back</button>
+        </div>
+    `;
+    
+    document.getElementById('addManagerForm').addEventListener('submit', handleAddManager);
+    loadManagers();
+}
+
+async function loadManagers() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/reporting-managers`);
+        const managers = await response.json();
+        const container = document.getElementById('managersList');
+        
+        if (managers.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666;">No managers found.</p>';
+            return;
+        }
+        
+        container.innerHTML = managers.map(manager => `
+            <div style="background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0;">${manager.name}</h3>
+                    <small style="color: #666;">ID: ${manager._id}</small>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="editManager('${manager._id}', '${manager.name.replace(/'/g, "\\'")}')" style="background: #3498db;">Edit</button>
+                    <button onclick="deleteManager('${manager._id}', '${manager.name.replace(/'/g, "\\'")}')" style="background: #e74c3c;">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading managers:', error);
+    }
+}
+
+async function handleAddManager(e) {
+    e.preventDefault();
+    const name = document.getElementById('managerName').value;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/reporting-managers`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAdminToken}`
+            },
+            body: JSON.stringify({ name })
+        });
+        
+        if (response.ok) {
+            alert('Manager added successfully!');
+            document.getElementById('managerName').value = '';
+            loadManagers();
+        } else {
+            alert('Error adding manager');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function editManager(managerId, currentName) {
+    const newName = prompt('Enter new manager name:', currentName);
+    if (!newName || newName === currentName) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/reporting-managers/${managerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAdminToken}`
+            },
+            body: JSON.stringify({ name: newName })
+        });
+        
+        if (response.ok) {
+            alert('Manager updated successfully!');
+            loadManagers();
+        } else {
+            alert('Error updating manager');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteManager(managerId, managerName) {
+    if (!confirm(`Are you sure you want to delete manager "${managerName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/reporting-managers/${managerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${currentAdminToken}`
+            }
+        });
+        
+        if (response.ok) {
+            alert('Manager deleted successfully!');
+            loadManagers();
+        } else {
+            alert('Error deleting manager');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}

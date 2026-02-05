@@ -1,0 +1,11 @@
+{
+  "name": "trainerpoll-frontend",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "start": "serve ."
+  },
+  "dependencies": {
+    "serve": "^14.0.1"
+  }
+}
