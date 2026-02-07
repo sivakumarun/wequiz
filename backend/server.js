@@ -13,7 +13,10 @@ const path = require('path');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['https://wequiz-one.vercel.app', 'http://localhost:3000', 'http://localhost:5001'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Setup multer for file uploads
