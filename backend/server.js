@@ -23,7 +23,20 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 // MongoDB connection
+// MongoDB connection
 const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/trainerpoll';
+
+console.log('--- ENVIRONMENT DEBUG START ---');
+console.log('Available Env Keys:', Object.keys(process.env).join(', '));
+console.log('MONGODB_URI Type:', typeof process.env.MONGODB_URI);
+console.log('MONGODB_URI Length:', process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 'N/A');
+// Check for common typos or whitespace issues
+const suspiciousKeys = Object.keys(process.env).filter(key => key.includes('MONGO') || key.trim() !== key);
+if (suspiciousKeys.length > 0) {
+  console.log('⚠️ Suspicious Env Keys Found (Typo/Whitespace?):', suspiciousKeys);
+}
+console.log('--- ENVIRONMENT DEBUG END ---');
+
 console.log('Attempting to connect to DB at:', dbUri.startsWith('mongodb+srv') ? 'Remote MongoDB Cluster (Correct)' : 'Localhost (Wrong - Env Var Not Set)');
 mongoose.connect(dbUri, {
   useNewUrlParser: true,
