@@ -25,7 +25,7 @@ ResponseSchema.pre('save', async function (next) {
 
         // Calculate points earned
         if (this.isCorrect) {
-          let points = question.points || 10;
+          let points = question.points || 1;
 
           // Bonus points for speed (if answered in under 5 seconds)
           if (this.responseTime && this.responseTime < 5000) {

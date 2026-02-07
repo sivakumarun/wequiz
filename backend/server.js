@@ -88,7 +88,48 @@ app.post('/api/user/login', async (req, res) => {
     const { employeeId, name, reportingManager } = req.body;
     let user = await User.findOne({ employeeId });
     if (!user) {
-      user = await User.create({ employeeId, name, reportingManager });
+      user = await User.create({
+        employeeId,
+        name,
+        reportingManager,
+        lastActive: new Date(),
+        isActive: true,
+        sessionStarted: new Date()
+      });
+    } else {
+      // Update session tracking for existing user
+      user.lastActive = new Date();
+      user.isActive = true;
+      user.sessionStarted = new Date();
+      await user.save();
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User Logout Route
+app.post('/api/user/logout', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const user = await User.findById(userId);
+    if (user) {
+      user.isActive = false;
+      await user.save();
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get User by ID (for session validation)
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
     res.json(user);
   } catch (error) {
@@ -112,7 +153,12 @@ app.get('/api/reporting-managers', async (req, res) => {
 // Questions Routes (Admin only)
 app.post('/api/questions', authenticateAdmin, async (req, res) => {
   try {
-    const question = await Question.create(req.body);
+    // Set default points to 1 if not provided
+    const questionData = {
+      ...req.body,
+      points: req.body.points || 1
+    };
+    const question = await Question.create(questionData);
     res.json(question);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -240,7 +286,7 @@ app.post('/api/questions/bulk-upload', authenticateAdmin, upload.single('file'),
             category,
             options,
             correctAnswer,
-            points: 10 // Default points
+            points: 1 // Default points to 1
           };
 
           // Validate type
@@ -351,8 +397,21 @@ app.get('/api/session', async (req, res) => {
       console.log('No session found, creating new one');
       session = await Session.create({});
     }
-    console.log('Session data:', session);
-    res.json(session);
+
+    // Add Stats - Only count users currently logged in (isActive = true)
+    const activeUserCount = await User.countDocuments({
+      isActive: true
+    });
+    const responseCount = session.activeQuestionId
+      ? await Response.countDocuments({ questionId: session.activeQuestionId })
+      : 0;
+
+    const sessionData = session.toObject();
+    sessionData.activeUserCount = activeUserCount;
+    sessionData.responseCount = responseCount;
+
+    console.log('Session data:', sessionData);
+    res.json(sessionData);
   } catch (error) {
     console.error('Error fetching session:', error);
     res.status(500).json({ error: error.message });
@@ -473,6 +532,7 @@ app.get('/api/leaderboard', async (req, res) => {
 
     // Add ranking
     const rankedLeaderboard = leaderboard.map((user, index) => ({
+      _id: user._id,  // CRITICAL: Include _id for rank matching
       rank: index + 1,
       employeeId: user.employeeId,
       name: user.name,
@@ -644,6 +704,53 @@ app.get('/api/analytics/question/:id', async (req, res) => {
   }
 });
 
+// Detailed CSV Report
+app.get('/api/reports/detailed', authenticateAdmin, async (req, res) => {
+  try {
+    const responses = await Response.find()
+      .populate('userId')
+      .populate('questionId')
+      .sort({ createdAt: -1 });
+
+    const reportData = responses.map(r => {
+      const user = r.userId || {};
+      const question = r.questionId || {};
+
+      return {
+        'Date': r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+        'Reporting Manager': user.reportingManager || 'Unknown',
+        'Employee ID': user.employeeId || 'Unknown',
+        'Name': user.name || 'Unknown',
+        'Question Category': question.category || '',
+        'Question Type': question.type || '',
+        'Question': question.text || 'Deleted Question',
+        'User Answer': r.answer || '',
+        'Correct Answer': question.correctAnswer || '',
+        'Is Correct': r.isCorrect ? 'Yes' : 'No',
+        'Score': r.pointsEarned || 0,
+        'Response Time (ms)': r.responseTime || 0
+      };
+    });
+
+    const fields = [
+      'Date', 'Reporting Manager', 'Employee ID', 'Name',
+      'Question Category', 'Question Type', 'Question',
+      'User Answer', 'Correct Answer', 'Is Correct', 'Score', 'Response Time (ms)'
+    ];
+
+    const parser = new Parser({ fields });
+    const csv = parser.parse(reportData);
+
+    res.header('Content-Type', 'text/csv');
+    res.header('Content-Disposition', `attachment; filename="quiz_report_${Date.now()}.csv"`);
+    res.send(csv);
+
+  } catch (error) {
+    console.error('Error generating report:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health Check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
@@ -726,12 +833,17 @@ app.get('/api/leaderboard', async (req, res) => {
         ? validResponses.reduce((sum, r) => sum + r.responseTime, 0) / validResponses.length
         : 999999; // High number for users with no response times
 
+      // Calculate accuracy
+      const correctAnswers = responses.filter(r => r.isCorrect).length;
+      const accuracy = responses.length > 0 ? Math.round((correctAnswers / responses.length) * 100) : 0;
+
       return {
         _id: user._id,
         name: user.name,
         employeeId: user.employeeId,
         reportingManager: user.reportingManager,
         points,
+        accuracy,
         avgResponseTime: Math.round(avgResponseTime),
         totalQuestions: responses.length
       };
@@ -752,21 +864,48 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
-// Clear all responses (for new quiz instances)
-app.delete('/api/responses/clear-all', authenticateAdmin, async (req, res) => {
+// Migrate all questions to 1 point (Admin only)
+app.post('/api/questions/migrate-points', authenticateAdmin, async (req, res) => {
   try {
-    const result = await Response.deleteMany({});
-
-    // Also reset user points to 0
-    await User.updateMany({}, { $set: { points: 0 } });
+    const result = await Question.updateMany(
+      {}, // Update all questions
+      { $set: { points: 1 } }
+    );
 
     res.json({
       success: true,
-      message: `Cleared ${result.deletedCount} responses and reset all user points`,
-      deletedCount: result.deletedCount
+      message: `Updated ${result.modifiedCount} questions to 1 point`,
+      modifiedCount: result.modifiedCount
     });
   } catch (error) {
-    console.error('Error clearing responses:', error);
+    console.error('Error migrating question points:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear all responses and users (Fresh Start)
+app.delete('/api/responses/clear-all', authenticateAdmin, async (req, res) => {
+  try {
+    // Step 1: Set the clearAllTriggered flag to signal all users to logout
+    await Session.updateOne({}, { clearAllTriggered: true });
+
+    // Step 2: Wait 3 seconds for users to receive the signal and logout
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Step 3: Delete all responses and users
+    const responseResult = await Response.deleteMany({});
+    const userResult = await User.deleteMany({}); // Delete all users too
+
+    // Step 4: Reset the clearAllTriggered flag
+    await Session.updateOne({}, { clearAllTriggered: false });
+
+    res.json({
+      success: true,
+      message: `Fresh Start: Cleared ${responseResult.deletedCount} responses and ${userResult.deletedCount} users.`,
+      deletedCount: responseResult.deletedCount
+    });
+  } catch (error) {
+    console.error('Error clearing data:', error);
     res.status(500).json({ error: error.message });
   }
 });

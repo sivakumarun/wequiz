@@ -14,6 +14,8 @@ const UserSchema = new mongoose.Schema({
   }],
   participatedSessions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'QuizSession' }],
   lastActive: { type: Date, default: Date.now },
+  isActive: { type: Boolean, default: false }, // Track if user is currently logged in
+  sessionStarted: { type: Date }, // When user logged in
   createdAt: { type: Date, default: Date.now }
 });
 

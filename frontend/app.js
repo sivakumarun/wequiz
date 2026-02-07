@@ -1,4 +1,7 @@
-const API_BASE_URL = 'https://wequiz.up.railway.app/api';
+// API Base URL - automatically switches between local and production
+const API_BASE_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:5001/api'
+    : 'https://wequiz.up.railway.app/api';
 let currentUser = null;
 let currentAdminToken = null;
 let answeredQuestions = new Set(); // Track questions user has answered
@@ -105,7 +108,11 @@ function showUserDashboard() {
 }
 
 // Show waiting state
-function showWaitingState() {
+async function showWaitingState() {
+    // Fetch latest user data and rank
+    await refreshUserData();
+    const userRank = await getUserRank();
+
     const root = document.getElementById('root');
     root.innerHTML = `
         <div class="container">
@@ -126,16 +133,16 @@ function showWaitingState() {
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding-top: 15px; border-top: 2px solid #e0e0e0;">
                     <div style="text-align: center;">
-                        <strong style="color: #667eea; font-size: 24px;">${currentUser.points || 0}</strong>
+                        <strong style="color: #667eea; font-size: 24px;" id="userPoints">${currentUser.points || 0}</strong>
                         <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">Points</p>
                     </div>
                     <div style="text-align: center;">
-                        <strong style="color: ${(currentUser.accuracy || 0) >= 80 ? '#27ae60' : (currentUser.accuracy || 0) >= 60 ? '#f39c12' : '#e74c3c'}; font-size: 24px;">${currentUser.accuracy || 0}%</strong>
+                        <strong style="color: ${(currentUser.accuracy || 0) >= 80 ? '#27ae60' : (currentUser.accuracy || 0) >= 60 ? '#f39c12' : '#e74c3c'}; font-size: 24px;" id="userAccuracy">${currentUser.accuracy || 0}%</strong>
                         <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">Accuracy</p>
                     </div>
                     <div style="text-align: center;">
-                        <strong style="color: #3498db; font-size: 24px;">${currentUser.totalQuestions || 0}</strong>
-                        <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">Questions</p>
+                        <strong style="color: #f39c12; font-size: 24px;" id="userRank">${userRank}</strong>
+                        <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">Rank</p>
                     </div>
                 </div>
             </div>
@@ -148,6 +155,38 @@ function showWaitingState() {
             <button onclick="logout()" style="background: #e74c3c;">Logout</button>
         </div>
     `;
+}
+
+// Get user's current rank from leaderboard
+async function getUserRank() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/leaderboard`);
+        const leaderboard = await response.json();
+
+        // Find user's position in the sorted leaderboard
+        const userIndex = leaderboard.findIndex(u => u._id === currentUser._id);
+        if (userIndex === -1) return '-';
+
+        // The rank is simply the position + 1, BUT we need to handle ties
+        // Users with same points AND same avgResponseTime should have the same rank
+        let rank = userIndex + 1; // Start with position-based rank
+
+        // Check if there are users ahead with the SAME score and time (tied)
+        const currentUserData = leaderboard[userIndex];
+        for (let i = 0; i < userIndex; i++) {
+            if (leaderboard[i].points === currentUserData.points &&
+                leaderboard[i].avgResponseTime === currentUserData.avgResponseTime) {
+                // Found a tied user ahead, use their rank
+                rank = i + 1;
+                break;
+            }
+        }
+
+        return `#${rank}`;
+    } catch (error) {
+        console.error('Error fetching rank:', error);
+        return '-';
+    }
 }
 
 // Poll for active questions
@@ -164,6 +203,14 @@ async function pollForQuestions() {
             const response = await fetch(`${API_BASE_URL}/session`);
             const session = await response.json();
             console.log('Session polled:', session);
+
+            // Check if admin has triggered a clear-all event
+            if (session.clearAllTriggered) {
+                console.log('Clear all triggered, logging out...');
+                alert('Your session has been cleared by the administrator. Please log in again.');
+                logout();
+                return;
+            }
 
             if (session.activeQuestionId) {
                 console.log('Active question ID:', session.activeQuestionId);
@@ -341,8 +388,17 @@ async function submitAnswer(questionId, answer) {
             // Fetch updated user data to get latest points and accuracy
             await refreshUserData();
 
-            // Show waiting state
-            showWaitingState();
+            // Show confirmation then waiting state
+            const root = document.getElementById('root');
+            root.innerHTML = `
+                <div class="container" style="text-align: center; padding-top: 100px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
+                    <h1 style="color: #27ae60; margin-bottom: 10px;">Response Submitted!</h1>
+                    <p style="color: #666; font-size: 18px; margin-bottom: 20px;">Your answer has been recorded successfully.</p>
+                    <p style="color: #999; font-size: 14px;">Redirecting in 5 seconds...</p>
+                </div>
+            `;
+            setTimeout(() => showWaitingState(), 5000);
         } else if (result.alreadyAnswered) {
             answeredQuestions.add(questionId);
             showWaitingState();
@@ -436,6 +492,8 @@ function showAdminDashboard() {
                 <button onclick="showQuestionManagement()" style="background: #9b59b6; padding: 20px; font-size: 16px;">Question Management</button>
                 <button onclick="showManagerManagement()" style="background: #16a085; padding: 20px; font-size: 16px;">Manager Management</button>
                 <button onclick="showCategoryManagement()" style="background: #e67e22; padding: 20px; font-size: 16px;">⚙️ Manage Categories</button>
+                <button onclick="downloadDetailedReport()" style="background: #27ae60; padding: 20px; font-size: 16px;">📊 Download Detailed Report</button>
+                <button onclick="migratePointsTo1()" style="background: #8e44ad; padding: 20px; font-size: 16px;">🔄 Migrate Points to 1</button>
                 <button onclick="logout()" style="background: #e74c3c; padding: 20px; font-size: 16px;">Logout</button>
             </div>
         </div>
@@ -1191,7 +1249,7 @@ async function handleCreateQuestion(e) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${currentAdminToken}`
             },
-            body: JSON.stringify({ text, type, category, options, correctAnswer, points: 10 })
+            body: JSON.stringify({ text, type, category, options, correctAnswer })
         });
 
         if (response.ok) {
@@ -1207,6 +1265,9 @@ async function handleCreateQuestion(e) {
 }
 
 // Show session control
+let adminPollInterval = null;
+let sessionTimerInterval = null;
+
 async function showSessionControl() {
     const root = document.getElementById('root');
 
@@ -1220,7 +1281,15 @@ async function showSessionControl() {
         <div class="container">
             <div class="admin-header">
                 <h1>Session Control</h1>
-                <button onclick="showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div style="background: #34495e; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold;">
+                        👥 Users: <span id="liveUserCount">0</span>
+                    </div>
+                     <div id="liveTimerBadge" style="background: #e74c3c; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold; display: none;">
+                        ⏱️ <span id="liveTimer">00:00:00</span>
+                    </div>
+                    <button onclick="stopAdminPolling(); showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
+                </div>
             </div>
             
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
@@ -1235,20 +1304,45 @@ async function showSessionControl() {
         </div>
     `;
     loadQuestionsForSession();
+
+    // Start polling for stats every 3 seconds
+    if (adminPollInterval) clearInterval(adminPollInterval);
+    adminPollInterval = setInterval(loadQuestionsForSession, 3000);
+}
+
+function stopAdminPolling() {
+    if (adminPollInterval) clearInterval(adminPollInterval);
+    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
 }
 
 // Load questions for session control
 async function loadQuestionsForSession() {
     try {
-        // Fetch current session state to know if there's an active question
+        // Fetch current session state
         const sessionResponse = await fetch(`${API_BASE_URL}/session`);
         const session = await sessionResponse.json();
         const activeQuestionId = session.activeQuestionId?._id || session.activeQuestionId;
+
+        // Update live user count
+        const userCountEl = document.getElementById('liveUserCount');
+        if (userCountEl) userCountEl.textContent = session.activeUserCount || 0;
+
+        // Handle Timer
+        const timerBadge = document.getElementById('liveTimerBadge');
+        if (activeQuestionId && session.currentQuestionStartTime) {
+            if (timerBadge) timerBadge.style.display = 'block';
+            startSessionTimer(new Date(session.currentQuestionStartTime));
+        } else {
+            if (timerBadge) timerBadge.style.display = 'none';
+            if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+        }
 
         // Fetch all questions
         const response = await fetch(`${API_BASE_URL}/questions`);
         let questions = await response.json();
         const container = document.getElementById('questionsList');
+
+        if (!container) return; // Guard clause if user navigated away
 
         // Filter by category if selected
         const categoryFilter = document.getElementById('categoryFilter')?.value;
@@ -1269,7 +1363,10 @@ async function loadQuestionsForSession() {
             return `
             <div style="background: ${isActive ? '#e8f5e9' : '#f8f9fa'}; padding: 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid ${isActive ? '#27ae60' : wasReleased ? '#f39c12' : 'transparent'};">
                 <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0;">${q.text}${isActive ? ' 🟢 <span style="color: #27ae60; font-size: 14px;">ACTIVE</span>' : ''}</h3>
+                    <h3 style="margin: 0 0 8px 0;">
+                        ${q.text}
+                        ${isActive ? ' 🟢 <span style="color: #27ae60; font-size: 14px;">ACTIVE</span>' : ''}
+                    </h3>
                     <div style="display: flex; gap: 15px; align-items: center;">
                         <small style="color: #666;">Category: <strong>${q.category || 'General'}</strong></small>
                         <small style="color: #666;">Type: ${q.type}</small>
@@ -1277,7 +1374,9 @@ async function loadQuestionsForSession() {
                         ${wasReleased ? `<small style="color: #f39c12; font-weight: 600;">📺 Released ${q.timesLaunched}x</small>` : '<small style="color: #27ae60; font-weight: 600;">✨ New</small>'}
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    ${isActive ? `<div style="background: #3498db; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; margin-right: 10px;">📝 Responses: ${session.responseCount || 0}</div>` : ''}
+                    
                     <button 
                         onclick="launchQuestion('${q._id}')" 
                         style="background: ${hasActiveQuestion && !isActive ? '#95a5a6' : '#27ae60'};"
@@ -1296,6 +1395,27 @@ async function loadQuestionsForSession() {
     } catch (error) {
         console.error('Error loading questions:', error);
     }
+}
+
+function startSessionTimer(startTime) {
+    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+
+    function updateTimer() {
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+
+        if (diff < 0) return; // Should not happen
+
+        const hours = Math.floor(diff / 3600).toString().padStart(2, '0');
+        const minutes = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+        const seconds = (diff % 60).toString().padStart(2, '0');
+
+        const timerEl = document.getElementById('liveTimer');
+        if (timerEl) timerEl.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    updateTimer();
+    sessionTimerInterval = setInterval(updateTimer, 1000);
 }
 
 // Launch question to users
@@ -1369,7 +1489,29 @@ async function loadLeaderboard() {
             return;
         }
 
-        container.innerHTML = users.map((u, index) => {
+        // Calculate ranks with tie-breaker logic
+        let currentRank = 1;
+        const usersWithRanks = users.map((user, index) => {
+            if (index > 0) {
+                const prevUser = users[index - 1];
+                // If points AND avg response time are different, increment rank
+                if (user.points !== prevUser.points || user.avgResponseTime !== prevUser.avgResponseTime) {
+                    currentRank = index + 1;
+                }
+            }
+            return { ...user, rank: currentRank };
+        });
+
+        // Format response time as MM:SS
+        const formatTime = (ms) => {
+            if (ms >= 999999) return '-';
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
+
+        container.innerHTML = usersWithRanks.map((u, index) => {
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
             const bgColor = index === 0 ? '#fff9e6' : index === 1 ? '#f5f5f5' : index === 2 ? '#fff5e6' : '#f8f9fa';
             const borderColor = index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : '#ddd';
@@ -1378,20 +1520,28 @@ async function loadLeaderboard() {
             <div style="background: ${bgColor}; padding: 20px; margin-bottom: 12px; border-radius: 8px; border-left: 4px solid ${borderColor}; display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center;">
                 <div style="text-align: center;">
                     <div style="font-size: 32px;">${medal}</div>
-                    <strong style="font-size: 20px; color: #667eea;">#${index + 1}</strong>
+                    <strong style="font-size: 20px; color: #667eea;">#${u.rank}</strong>
                 </div>
                 <div>
                     <h3 style="margin: 0 0 8px 0; font-size: 18px;">${u.name}</h3>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                        <small style="color: #666;"><strong>ID:</strong> ${u.employeeId}</small>
-                        <small style="color: #666;"><strong>Manager:</strong> ${u.reportingManager}</small>
-                        <small style="color: #666;"><strong>Questions:</strong> ${u.totalQuestions || 0}</small>
-                        ${u.avgResponseTime < 999999 ? `<small style="color: #27ae60; font-weight: 600;">⏱️ Avg: ${(u.avgResponseTime / 1000).toFixed(2)}s</small>` : ''}
+                    <div style="color: #666; font-size: 13px; margin-bottom: 8px;">
+                        <strong>ID:</strong> ${u.employeeId} | <strong>Manager:</strong> ${u.reportingManager}
                     </div>
-                </div>
-                <div style="text-align: right;">
-                    <strong style="font-size: 32px; color: #667eea;">${u.points || 0}</strong>
-                    <p style="margin: 0; color: #666; font-size: 14px;">Points</p>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">
+                        <div style="text-align: center; background: white; padding: 8px; border-radius: 4px;">
+                            <strong style="color: #667eea; font-size: 16px;">${u.points || 0}</strong>
+                            <p style="margin: 0; color: #666; font-size: 11px;">Points</p>
+                        </div>
+                        <div style="text-align: center; background: white; padding: 8px; border-radius: 4px;">
+                            <strong style="color: ${(u.accuracy || 0) >= 80 ? '#27ae60' : (u.accuracy || 0) >= 60 ? '#f39c12' : '#e74c3c'}; font-size: 16px;">${u.accuracy || 0}%</strong>
+                            <p style="margin: 0; color: #666; font-size: 11px;">Accuracy</p>
+                        </div>
+                        <div style="text-align: center; background: white; padding: 8px; border-radius: 4px;">
+                            <strong style="color: #3498db; font-size: 16px;">${u.totalQuestions || 0}</strong>
+                            <p style="margin: 0; color: #666; font-size: 11px;">Questions</p>
+                        </div>
+                    </div>
+                    ${u.avgResponseTime < 999999 ? `<div style="margin-top: 8px; color: #27ae60; font-weight: 600; font-size: 13px;">⏱️ Avg Response Time: ${formatTime(u.avgResponseTime)}</div>` : ''}
                 </div>
             </div>
         `;
@@ -1403,16 +1553,16 @@ async function loadLeaderboard() {
 
 // Clear all leaderboard data
 window.clearLeaderboard = async function () {
-    const input = prompt('⚠️ WARNING: This will permanently delete ALL user responses and reset all points to 0!\n\nThis is useful when starting a new quiz instance.\n\nType "CLEAR LEADERBOARD" to confirm:');
+    const input = prompt('⚠️ WARNING: FRESH START\n\nThis will permanently DELETE:\n1. ALL Users\n2. ALL Responses\n3. ALL Scores\n\nType "FRESH START" to confirm:');
 
-    if (input !== 'CLEAR LEADERBOARD') {
+    if (input !== 'FRESH START') {
         if (input !== null) {
-            alert('Action cancelled. You must type "CLEAR LEADERBOARD" exactly to confirm.');
+            alert('Action cancelled. You must type "FRESH START" exactly to confirm.');
         }
         return;
     }
 
-    const confirmAgain = confirm('Are you absolutely sure?\n\nThis will:\n✗ Delete all user responses\n✗ Reset all user points to 0\n\nThis CANNOT be undone!\n\nClick OK to proceed.');
+    const confirmAgain = confirm('Are you absolutely sure?\n\nThis will:\n✗ Delete all user responses\n✗ Delete all users\n✗ Reset everything to zero\n\nThis CANNOT be undone!\n\nClick OK to proceed.');
 
     if (!confirmAgain) {
         return;
@@ -1430,12 +1580,75 @@ window.clearLeaderboard = async function () {
 
         if (response.ok) {
             alert(`✓ ${result.message}`);
-            loadLeaderboard();
+            // Reload the leaderboard page to show empty state
+            showEnhancedLeaderboard();
         } else {
             alert('Error: ' + (result.error || 'Failed to clear leaderboard'));
         }
     } catch (error) {
         alert('Error clearing leaderboard: ' + error.message);
+    }
+};
+
+// Download Detailed Report
+window.downloadDetailedReport = async function () {
+    try {
+        // Create a temporary link to trigger download
+        const link = document.createElement('a');
+        link.href = `${API_BASE_URL}/reports/detailed`;
+        link.setAttribute('target', '_blank');
+
+        // Add authorization header by using fetch and creating blob
+        const response = await fetch(`${API_BASE_URL}/reports/detailed`, {
+            headers: {
+                'Authorization': `Bearer ${currentAdminToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download report');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `quiz_detailed_report_${Date.now()}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        alert('✅ Report downloaded successfully!');
+    } catch (error) {
+        console.error('Error downloading report:', error);
+        alert('Error downloading report. Please try again.');
+    }
+};
+
+// Migrate all questions to 1 point
+window.migratePointsTo1 = async function () {
+    const confirm = window.confirm('⚠️ This will update ALL existing questions to award 1 point instead of 10.\n\nDo you want to continue?');
+
+    if (!confirm) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions/migrate-points`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentAdminToken}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`✅ ${result.message}\n\nAll questions now award 1 point!`);
+        } else {
+            throw new Error(result.error || 'Migration failed');
+        }
+    } catch (error) {
+        console.error('Error migrating points:', error);
+        alert('Error migrating points. Please try again.');
     }
 };
 
@@ -1590,6 +1803,15 @@ async function loadEnhancedLeaderboard() {
         const leaderboard = await response.json();
         const container = document.getElementById('leaderboardList');
 
+        // Format response time as MM:SS
+        const formatTime = (ms) => {
+            if (ms >= 999999) return '-';
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
+
         if (leaderboard.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: #666;">No trainers found.</p>';
             return;
@@ -1607,7 +1829,7 @@ async function loadEnhancedLeaderboard() {
                             </div>
                         </div>
                         
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 15px 0;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0;">
                             <div>
                                 <small style="color: #666;">Points</small>
                                 <p style="margin: 5px 0 0 0; font-size: 20px; font-weight: 600; color: #667eea;">${user.points}</p>
@@ -1620,22 +1842,9 @@ async function loadEnhancedLeaderboard() {
                                 <small style="color: #666;">Questions</small>
                                 <p style="margin: 5px 0 0 0; font-size: 20px; font-weight: 600;">${user.totalQuestions}</p>
                             </div>
-                            <div>
-                                <small style="color: #666;">Sessions</small>
-                                <p style="margin: 5px 0 0 0; font-size: 20px; font-weight: 600;">${user.sessionsParticipated}</p>
-                            </div>
                         </div>
                         
-                        ${user.badges && user.badges.length > 0 ? `
-                            <div style="margin-top: 15px;">
-                                <small style="color: #666;">Badges Earned:</small>
-                                <div style="margin-top: 8px;">
-                                    ${user.badges.map(badge => `
-                                        <span title="${badge.name}" style="font-size: 24px; margin-right: 8px;">${badge.icon}</span>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
+                        ${user.avgResponseTime < 999999 ? `<div style="margin-top: 8px; color: #27ae60; font-weight: 600; font-size: 13px;">⏱️ Avg Response Time: ${formatTime(user.avgResponseTime)}</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -2460,3 +2669,33 @@ async function deleteCategory(categoryId, categoryName) {
         alert('Error: ' + error.message);
     }
 }
+
+// Logout function
+function logout() {
+    if (currentUser) {
+        // Call backend to mark user as inactive
+        fetch(`${API_BASE_URL}/user/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser._id })
+        }).catch(err => console.error('Logout error:', err));
+    }
+
+    // Clear local storage
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminToken');
+
+    // Reset state
+    currentUser = null;
+    currentAdminToken = null;
+    answeredQuestions.clear();
+
+    // Stop polling
+    if (pollInterval) clearInterval(pollInterval);
+    if (adminPollInterval) clearInterval(adminPollInterval);
+    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+
+    // Redirect to login
+    showLoginForm();
+}
+

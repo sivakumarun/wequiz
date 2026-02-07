@@ -6,7 +6,7 @@ const QuestionSchema = new mongoose.Schema({
   category: { type: String, default: 'General' }, // Category for filtering
   options: [String],
   correctAnswer: { type: String },
-  points: { type: Number, default: 10 },
+  points: { type: Number, default: 1 },
   timesLaunched: { type: Number, default: 0 }, // Track how many times released
   lastLaunched: { type: Date }, // When was it last launched
   createdAt: { type: Date, default: Date.now }
