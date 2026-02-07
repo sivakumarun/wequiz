@@ -156,6 +156,10 @@ async function pollForQuestions() {
     if (pollInterval) clearInterval(pollInterval);
 
     pollInterval = setInterval(async () => {
+        if (!currentUser) {
+            clearInterval(pollInterval);
+            return;
+        }
         try {
             const response = await fetch(`${API_BASE_URL}/session`);
             const session = await response.json();

@@ -26,16 +26,9 @@ const upload = multer({ dest: 'uploads/' });
 // MongoDB connection
 const dbUri = process.env.MONGODB_URI || 'mongodb+srv://sivakumarun_db_admin:9QNF61j73JfLzkgN@quiz.vmghgku.mongodb.net/trainerpoll?retryWrites=true&w=majority&appName=quiz';
 
-console.log('--- ENVIRONMENT DEBUG START ---');
-console.log('Available Env Keys:', Object.keys(process.env).join(', '));
-console.log('MONGODB_URI Type:', typeof process.env.MONGODB_URI);
-console.log('MONGODB_URI Length:', process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 'N/A');
-// Check for common typos or whitespace issues
-const suspiciousKeys = Object.keys(process.env).filter(key => key.includes('MONGO') || key.trim() !== key);
-if (suspiciousKeys.length > 0) {
-  console.log('⚠️ Suspicious Env Keys Found (Typo/Whitespace?):', suspiciousKeys);
-}
-console.log('--- ENVIRONMENT DEBUG END ---');
+// Configuration with Fallbacks
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 console.log('Attempting to connect to DB at:', dbUri.startsWith('mongodb+srv') ? 'Remote MongoDB Cluster (Correct)' : 'Localhost (Wrong - Env Var Not Set)');
 mongoose.connect(dbUri, {
@@ -71,7 +64,7 @@ const authenticateAdmin = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    jwt.verify(token, JWT_SECRET);
     next();
   } catch (error) {
     res.status(401).json({ error: 'Invalid token' });
@@ -81,8 +74,8 @@ const authenticateAdmin = (req, res, next) => {
 // Admin Login Route
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
-  if (password === process.env.ADMIN_PASSWORD) {
-    const token = jwt.sign({ admin: true }, process.env.JWT_SECRET);
+  if (password === ADMIN_PASSWORD) {
+    const token = jwt.sign({ admin: true }, JWT_SECRET);
     res.json({ token });
   } else {
     res.status(401).json({ error: 'Invalid password' });
