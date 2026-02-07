@@ -24,7 +24,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // MongoDB connection
 // MongoDB connection
-const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/trainerpoll';
+const dbUri = process.env.MONGODB_URI || 'mongodb+srv://sivakumarun_db_admin:9QNF61j73JfLzkgN@quiz.vmghgku.mongodb.net/trainerpoll?retryWrites=true&w=majority&appName=quiz';
 
 console.log('--- ENVIRONMENT DEBUG START ---');
 console.log('Available Env Keys:', Object.keys(process.env).join(', '));
