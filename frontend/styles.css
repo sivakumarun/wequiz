@@ -25,7 +25,7 @@
     --gray-700: #495057;
     --gray-800: #343a40;
     --gray-900: #212529;
-    
+
     /* Spacing */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
@@ -33,7 +33,7 @@
     --spacing-lg: 24px;
     --spacing-xl: 32px;
     --spacing-2xl: 48px;
-    
+
     /* Typography - Responsive using clamp() */
     --text-xs: clamp(0.75rem, 2vw, 0.875rem);
     --text-sm: clamp(0.875rem, 2.5vw, 1rem);
@@ -42,7 +42,7 @@
     --text-xl: clamp(1.25rem, 4vw, 1.5rem);
     --text-2xl: clamp(1.5rem, 5vw, 2rem);
     --text-3xl: clamp(2rem, 6vw, 2.5rem);
-    
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
@@ -50,7 +50,7 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    
+
     /* Border Radius */
     --radius-sm: 4px;
     --radius: 6px;
@@ -59,12 +59,12 @@
     --radius-xl: 16px;
     --radius-2xl: 24px;
     --radius-full: 9999px;
-    
+
     /* Transitions */
     --transition-fast: 150ms ease-in-out;
     --transition-base: 200ms ease-in-out;
     --transition-slow: 300ms ease-in-out;
-    
+
     /* Container Max Widths */
     --container-sm: 640px;
     --container-md: 768px;
@@ -96,7 +96,7 @@
     .grid-responsive-3 {
         grid-template-columns: repeat(3, 1fr) !important;
     }
-    
+
     .grid-responsive-4 {
         grid-template-columns: repeat(4, 1fr) !important;
     }
@@ -145,7 +145,8 @@
    ENHANCED BUTTONS
    ======================================== */
 button {
-    min-height: 44px !important; /* Touch-friendly */
+    min-height: 44px !important;
+    /* Touch-friendly */
     font-size: var(--text-base) !important;
     font-weight: 600 !important;
     border-radius: var(--radius-md) !important;
@@ -193,7 +194,8 @@ button:active::before {
 input,
 select,
 textarea {
-    min-height: 44px !important; /* Touch-friendly */
+    min-height: 44px !important;
+    /* Touch-friendly */
     font-size: var(--text-base) !important;
     border-radius: var(--radius-md) !important;
     transition: all var(--transition-base) !important;
@@ -305,9 +307,12 @@ small {
    LOADING STATES
    ======================================== */
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -332,41 +337,117 @@ small {
    ======================================== */
 
 /* Spacing */
-.mt-sm { margin-top: var(--spacing-sm) !important; }
-.mt-md { margin-top: var(--spacing-md) !important; }
-.mt-lg { margin-top: var(--spacing-lg) !important; }
-.mb-sm { margin-bottom: var(--spacing-sm) !important; }
-.mb-md { margin-bottom: var(--spacing-md) !important; }
-.mb-lg { margin-bottom: var(--spacing-lg) !important; }
-.p-sm { padding: var(--spacing-sm) !important; }
-.p-md { padding: var(--spacing-md) !important; }
-.p-lg { padding: var(--spacing-lg) !important; }
+.mt-sm {
+    margin-top: var(--spacing-sm) !important;
+}
+
+.mt-md {
+    margin-top: var(--spacing-md) !important;
+}
+
+.mt-lg {
+    margin-top: var(--spacing-lg) !important;
+}
+
+.mb-sm {
+    margin-bottom: var(--spacing-sm) !important;
+}
+
+.mb-md {
+    margin-bottom: var(--spacing-md) !important;
+}
+
+.mb-lg {
+    margin-bottom: var(--spacing-lg) !important;
+}
+
+.p-sm {
+    padding: var(--spacing-sm) !important;
+}
+
+.p-md {
+    padding: var(--spacing-md) !important;
+}
+
+.p-lg {
+    padding: var(--spacing-lg) !important;
+}
 
 /* Text Alignment */
-.text-center { text-align: center !important; }
-.text-left { text-align: left !important; }
-.text-right { text-align: right !important; }
+.text-center {
+    text-align: center !important;
+}
+
+.text-left {
+    text-align: left !important;
+}
+
+.text-right {
+    text-align: right !important;
+}
 
 /* Display */
-.hidden { display: none !important; }
-.block { display: block !important; }
-.inline-block { display: inline-block !important; }
-.flex { display: flex !important; }
-.grid { display: grid !important; }
+.hidden {
+    display: none !important;
+}
+
+.block {
+    display: block !important;
+}
+
+.inline-block {
+    display: inline-block !important;
+}
+
+.flex {
+    display: flex !important;
+}
+
+.grid {
+    display: grid !important;
+}
 
 /* Flexbox */
-.flex-col { flex-direction: column !important; }
-.flex-row { flex-direction: row !important; }
-.items-center { align-items: center !important; }
-.justify-center { justify-content: center !important; }
-.justify-between { justify-content: space-between !important; }
-.gap-sm { gap: var(--spacing-sm) !important; }
-.gap-md { gap: var(--spacing-md) !important; }
-.gap-lg { gap: var(--spacing-lg) !important; }
+.flex-col {
+    flex-direction: column !important;
+}
+
+.flex-row {
+    flex-direction: row !important;
+}
+
+.items-center {
+    align-items: center !important;
+}
+
+.justify-center {
+    justify-content: center !important;
+}
+
+.justify-between {
+    justify-content: space-between !important;
+}
+
+.gap-sm {
+    gap: var(--spacing-sm) !important;
+}
+
+.gap-md {
+    gap: var(--spacing-md) !important;
+}
+
+.gap-lg {
+    gap: var(--spacing-lg) !important;
+}
 
 /* Width */
-.w-full { width: 100% !important; }
-.w-auto { width: auto !important; }
+.w-full {
+    width: 100% !important;
+}
+
+.w-auto {
+    width: auto !important;
+}
 
 /* ========================================
    RESPONSIVE TABLES
@@ -378,30 +459,36 @@ table {
 
 /* Mobile: Stack table */
 @media (max-width: 639px) {
-    table, thead, tbody, th, td, tr {
+
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
         display: block;
     }
-    
+
     thead tr {
         position: absolute;
         top: -9999px;
         left: -9999px;
     }
-    
+
     tr {
         margin-bottom: var(--spacing-md);
         border: 1px solid var(--gray-300);
         border-radius: var(--radius-md);
         padding: var(--spacing-sm);
     }
-    
+
     td {
         border: none;
         position: relative;
         padding-left: 50% !important;
         text-align: right;
     }
-    
+
     td:before {
         position: absolute;
         left: var(--spacing-sm);
@@ -422,6 +509,7 @@ table {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -436,6 +524,7 @@ table {
     from {
         transform: translateX(-100%);
     }
+
     to {
         transform: translateX(0);
     }
@@ -482,11 +571,11 @@ img {
     .no-print {
         display: none !important;
     }
-    
+
     body {
         background: white;
     }
-    
+
     .container {
         box-shadow: none;
     }
@@ -533,4 +622,122 @@ img {
         background: #2a2a2a;
     }
     */
+}
+
+/* ========================================
+   MOBILE FIXES - PREVENT HORIZONTAL SCROLL
+   ======================================== */
+
+/* Prevent any element from causing horizontal scroll */
+* {
+    max-width: 100%;
+}
+
+html,
+body {
+    overflow-x: hidden !important;
+    width: 100%;
+}
+
+#root {
+    overflow-x: hidden !important;
+}
+
+/* Fix all inline grid layouts on mobile */
+@media (max-width: 639px) {
+
+    /* Force all grids to single column on mobile */
+    [style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Fix button groups - stack vertically */
+    [style*="display: flex"],
+    [style*="display:flex"] {
+        flex-direction: column !important;
+        gap: var(--spacing-sm) !important;
+    }
+
+    /* Ensure all buttons are full width on mobile */
+    button {
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+    }
+
+    /* Fix question cards */
+    div[style*="border-left"] {
+        padding: var(--spacing-md) !important;
+        margin-bottom: var(--spacing-sm) !important;
+    }
+
+    /* Fix any fixed widths */
+    [style*="width:"],
+    [style*="width :"],
+    [style*="min-width"] {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Fix padding that might cause overflow */
+    .container {
+        padding: var(--spacing-md) !important;
+        margin: 0 !important;
+    }
+
+    /* Ensure text doesn't overflow */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span,
+    div {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    /* Fix admin header on mobile */
+    .admin-header {
+        padding: var(--spacing-sm) !important;
+        margin: calc(var(--spacing-md) * -1) calc(var(--spacing-md) * -1) var(--spacing-md) calc(var(--spacing-md) * -1) !important;
+    }
+
+    .admin-header h1 {
+        font-size: var(--text-lg) !important;
+    }
+
+    /* Fix select dropdowns */
+    select {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Fix input fields */
+    input {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Fix any absolute positioning that might cause issues */
+    [style*="position: absolute"],
+    [style*="position:absolute"] {
+        position: relative !important;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 640px) and (max-width: 1023px) {
+
+    /* 2 column grids on tablet */
+    [style*="grid-template-columns: repeat(3"],
+    [style*="grid-template-columns:repeat(3"],
+    [style*="grid-template-columns: repeat(4"],
+    [style*="grid-template-columns:repeat(4"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
 }
