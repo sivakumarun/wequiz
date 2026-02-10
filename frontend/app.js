@@ -77,10 +77,10 @@ async function showLoginForm() { // Renamed from showLoginPage and made async
             <div style="text-align: center; margin-top: 20px;">
                 <a href="#" onclick="showAdminLogin()" style="color: #667eea; text-decoration: none; font-weight: 600;">Are You a HOST ?</a>
             </div>
-            
-            <!-- Bootcamp Logo at Bottom remains inside for balance -->
-            <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
         </div>
+
+        <!-- Bootcamp Logo - Moved Outside Bottom -->
+        <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
     `;
 
     document.getElementById('loginForm').addEventListener('submit', handleUserLogin);
@@ -126,6 +126,9 @@ async function showWaitingState() {
 
     const root = document.getElementById('root');
     root.innerHTML = `
+        <!-- Jump In Logo - Top Outside -->
+        <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+        
         <div class="container">
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px;">
@@ -165,6 +168,9 @@ async function showWaitingState() {
             
             <button onclick="logout()" style="background: #e74c3c;">Logout</button>
         </div>
+
+        <!-- Bootcamp Logo - Bottom Outside -->
+        <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
     `;
 }
 
@@ -312,6 +318,9 @@ async function showQuestion(question) {
 
     const root = document.getElementById('root');
     root.innerHTML = `
+        <!-- Jump In Logo - Top Outside -->
+        <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+        
         <div class="container">
             <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.1);">
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
@@ -344,6 +353,9 @@ async function showQuestion(question) {
             
             <button onclick="logout()" style="background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.3); color: #ff6b6b; font-size: 14px; padding: 10px;">Logout</button>
         </div>
+
+        <!-- Bootcamp Logo - Bottom Outside -->
+        <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
     `;
 
     renderOptions(question);
@@ -449,12 +461,18 @@ async function submitAnswer(questionId) {
             // Show confirmation then waiting state
             const root = document.getElementById('root');
             root.innerHTML = `
+                <!-- Jump In Logo - Top Outside -->
+                <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+                
                 <div class="container" style="text-align: center; padding-top: 100px;">
                     <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
                     <h1 style="color: #27ae60; margin-bottom: 10px;">Response Submitted!</h1>
                     <p style="color: #666; font-size: 18px; margin-bottom: 20px;">Your answer has been recorded successfully.</p>
                     <p style="color: #999; font-size: 14px;">Redirecting in 5 seconds...</p>
                 </div>
+
+                <!-- Bootcamp Logo - Bottom Outside -->
+                <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
             `;
             setTimeout(() => showWaitingState(), 5000);
         } else if (result.alreadyAnswered) {
@@ -496,6 +514,9 @@ async function refreshUserData() {
 function showAdminLogin() {
     const root = document.getElementById('root');
     root.innerHTML = `
+        <!-- Jump In Logo - Top Outside -->
+        <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+        
         <div class="container">
             <h1>Admin Login</h1>
             <form id="adminLoginForm">
@@ -507,9 +528,12 @@ function showAdminLogin() {
                 <div id="adminError"></div>
             </form>
             <div style="text-align: center; margin-top: 20px;">
-                <a href="#" onclick="showLoginPage()" style="color: #667eea; text-decoration: none; font-weight: 600;">← User Login</a>
+                <a href="#" onclick="showLoginForm()" style="color: #667eea; text-decoration: none; font-weight: 600;">← User Login</a>
             </div>
         </div>
+
+        <!-- Bootcamp Logo - Bottom Outside -->
+        <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
     `;
     document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 }
@@ -541,6 +565,9 @@ async function handleAdminLogin(e) {
 function showAdminDashboard() {
     const root = document.getElementById('root');
     root.innerHTML = `
+        <!-- Jump In Logo - Top Outside -->
+        <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+        
         <div class="container">
             <h1>Control Center</h1>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
@@ -555,6 +582,9 @@ function showAdminDashboard() {
                 <button onclick="logout()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">🚪 Logout</button>
             </div>
         </div>
+
+        <!-- Bootcamp Logo - Bottom Outside -->
+        <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
     `;
 }
 
