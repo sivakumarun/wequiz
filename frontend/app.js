@@ -5,6 +5,8 @@ const API_BASE_URL = window.location.hostname === 'localhost'
 let currentUser = null;
 let currentAdminToken = null;
 let answeredQuestions = new Set(); // Track questions user has answered
+let selectedAnswer = null; // Track currently selected answer before submission
+let currentQuestionId = null; // Track currently displayed question ID
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,8 +50,11 @@ async function showLoginForm() { // Renamed from showLoginPage and made async
 
     const root = document.getElementById('root');
     root.innerHTML = `
+        <!-- Jump In Logo - Now Outside Container -->
+        <img src="./assets/logo-jumpin.png" alt="Jump In Logo" class="logo-top" />
+        
         <div class="container">
-            <h1>TrainerPoll - Login</h1>
+            <h1>Let's Jump in..🏃‍➡️</h1>
             <form id="loginForm">
                 <div class="form-group">
                     <label for="employeeId">Employee ID (9 digits)</label>
@@ -72,6 +77,9 @@ async function showLoginForm() { // Renamed from showLoginPage and made async
             <div style="text-align: center; margin-top: 20px;">
                 <a href="#" onclick="showAdminLogin()" style="color: #667eea; text-decoration: none; font-weight: 600;">Are You a HOST ?</a>
             </div>
+            
+            <!-- Bootcamp Logo at Bottom remains inside for balance -->
+            <img src="./assets/logo-bootcamp.png" alt="Bootcamp Logo" class="logo-bottom" />
         </div>
     `;
 
@@ -112,6 +120,9 @@ async function showWaitingState() {
     // Fetch latest user data and rank
     await refreshUserData();
     const userRank = await getUserRank();
+
+    // Reset currentQuestionId so we can re-render if the same question is pushed again later
+    currentQuestionId = null;
 
     const root = document.getElementById('root');
     root.innerHTML = `
@@ -267,6 +278,13 @@ async function showQuestion(question) {
 
     const questionId = question._id || question.id;
 
+    // Guard: Prevent re-rendering if the question is already displayed
+    // This prevents the user's selection from being reset every 2 seconds by polling
+    if (currentQuestionId === questionId) {
+        console.log('Question already displayed, skipping re-render');
+        return;
+    }
+
     // Check if user has already answered this question
     if (answeredQuestions.has(questionId)) {
         console.log('User has already answered this question, showing waiting state');
@@ -290,33 +308,41 @@ async function showQuestion(question) {
     }
 
     currentQuestionId = questionId;
+    selectedAnswer = null; // Reset selection for the new question
 
     const root = document.getElementById('root');
     root.innerHTML = `
         <div class="container">
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.1);">
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
                     <div>
-                        <strong style="color: #666;">Employee ID</strong>
-                        <p style="font-size: 14px; color: #333;">${currentUser.employeeId}</p>
+                        <strong style="color: rgba(255, 255, 255, 0.6); font-size: 12px;">Employee ID</strong>
+                        <p style="font-size: 14px; color: #ffffff;">${currentUser.employeeId}</p>
                     </div>
                     <div>
-                        <strong style="color: #666;">Name</strong>
-                        <p style="font-size: 14px; color: #333;">${currentUser.name}</p>
+                        <strong style="color: rgba(255, 255, 255, 0.6); font-size: 12px;">Name</strong>
+                        <p style="font-size: 14px; color: #ffffff;">${currentUser.name}</p>
                     </div>
                     <div>
-                        <strong style="color: #666;">Manager</strong>
-                        <p style="font-size: 14px; color: #333;">${currentUser.reportingManager}</p>
+                        <strong style="color: rgba(255, 255, 255, 0.6); font-size: 12px;">Manager</strong>
+                        <p style="font-size: 14px; color: #ffffff;">${currentUser.reportingManager}</p>
                     </div>
                 </div>
             </div>
             
-            <div style="background: white; border: 3px solid #667eea; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
-                <h2 style="color: #333; margin-bottom: 20px;">${question.text || 'No question text'}</h2>
-                <div id="optionsContainer" style="display: grid; grid-template-columns: 1fr; gap: 10px;"></div>
+            <div style="background: rgba(255, 255, 255, 0.03); border: 2px solid rgba(147, 51, 234, 0.3); border-radius: 16px; padding: 30px; margin-bottom: 20px; backdrop-filter: blur(10px);">
+                <h2 style="color: #ffffff; margin-bottom: 25px; font-size: 22px; text-shadow: 0 0 15px rgba(147, 51, 234, 0.3);">${question.text || 'No question text'}</h2>
+                <div id="optionsContainer" style="display: grid; grid-template-columns: 1fr; gap: 12px;"></div>
+                
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <button id="submitAnswerBtn" onclick="submitAnswer('${questionId}')" disabled style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); opacity: 0.5; cursor: not-allowed; box-shadow: 0 4px 15px rgba(39, 174, 96, 0.2);">
+                        Submit Answer
+                    </button>
+                    <p id="selectionHint" style="color: rgba(255, 255, 255, 0.5); font-size: 12px; text-align: center; margin-top: 10px;">Select an option to enable submission</p>
+                </div>
             </div>
             
-            <button onclick="logout()" style="background: #e74c3c;">Logout</button>
+            <button onclick="logout()" style="background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.3); color: #ff6b6b; font-size: 14px; padding: 10px;">Logout</button>
         </div>
     `;
 
@@ -326,47 +352,79 @@ async function showQuestion(question) {
 // Render question options
 function renderOptions(question) {
     const container = document.getElementById('optionsContainer');
-    if (!container) {
-        console.error('optionsContainer not found');
-        return;
-    }
+    if (!container) return;
 
-    console.log('Rendering options for question:', question);
-
-    // Handle True/False questions - provide default options if none exist
     let options = question.options;
     if ((!options || options.length === 0) && question.type === 'True/False') {
-        console.log('True/False question detected with no options, using defaults');
         options = ['True', 'False'];
     }
 
     if (!options || options.length === 0) {
-        console.warn('No options available for this question');
-        container.innerHTML = '<p style="color: #e74c3c;">No options available</p>';
+        container.innerHTML = '<p style="color: #ff6b9d;">No options available</p>';
         return;
     }
 
-    container.innerHTML = ''; // Clear previous options
-    options.forEach((option, index) => {
+    container.innerHTML = '';
+    options.forEach((option) => {
         const button = document.createElement('button');
+        button.className = 'option-button';
         button.textContent = option;
-        button.style.background = '#667eea';
-        button.style.marginBottom = '10px';
-        button.style.padding = '12px';
-        button.style.color = 'white';
-        button.style.border = 'none';
-        button.style.borderRadius = '6px';
-        button.style.cursor = 'pointer';
-        button.style.fontSize = '16px';
-        button.onclick = () => submitAnswer(question._id, option);
+        button.style.background = 'rgba(255, 255, 255, 0.08)';
+        button.style.border = '1px solid rgba(255, 255, 255, 0.15)';
+        button.style.color = '#ffffff';
+        button.style.marginBottom = '8px';
+        button.style.textAlign = 'left';
+        button.style.paddingLeft = '20px';
+
+        button.onclick = () => {
+            // Update state
+            selectedAnswer = option;
+
+            // Highlight selected
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.classList.remove('selected-option');
+                btn.style.background = 'rgba(255, 255, 255, 0.08)';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                btn.style.boxShadow = 'none';
+            });
+
+            button.classList.add('selected-option');
+            button.style.background = 'linear-gradient(135deg, rgba(147, 51, 234, 0.7) 0%, rgba(79, 70, 229, 0.7) 100%)';
+            // Border and shadow are now handled by the .selected-option class in index.html
+
+            // Enable submit button
+            const submitBtn = document.getElementById('submitAnswerBtn');
+            const hint = document.getElementById('selectionHint');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+                submitBtn.style.transform = 'scale(1.02)';
+            }
+            if (hint) {
+                hint.textContent = 'Click Submit to confirm your answer';
+                hint.style.color = '#4ade80';
+            }
+        };
         container.appendChild(button);
     });
 }
 
 // Submit answer
-async function submitAnswer(questionId, answer) {
+async function submitAnswer(questionId) {
+    if (!selectedAnswer) return;
+
+    const answer = selectedAnswer;
     try {
         console.log('Submitting answer:', { questionId, answer });
+
+        // Show loading state on button
+        const submitBtn = document.getElementById('submitAnswerBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            submitBtn.style.opacity = '0.7';
+        }
         const response = await fetch(`${API_BASE_URL}/responses`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -484,17 +542,17 @@ function showAdminDashboard() {
     const root = document.getElementById('root');
     root.innerHTML = `
         <div class="container">
-            <h1>ATM Dashboard</h1>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <button onclick="showQuestionForm()" style="background: #3498db; padding: 20px; font-size: 16px;">Create Question</button>
-                <button onclick="showSessionControl()" style="background: #2980b9; padding: 20px; font-size: 16px;">Session Control</button>
-                <button onclick="showEnhancedLeaderboard()" style="background: #f39c12; padding: 20px; font-size: 16px;">View Leaderboard</button>
-                <button onclick="showQuestionManagement()" style="background: #9b59b6; padding: 20px; font-size: 16px;">Question Management</button>
-                <button onclick="showManagerManagement()" style="background: #16a085; padding: 20px; font-size: 16px;">Manager Management</button>
-                <button onclick="showCategoryManagement()" style="background: #e67e22; padding: 20px; font-size: 16px;">⚙️ Manage Categories</button>
-                <button onclick="downloadDetailedReport()" style="background: #27ae60; padding: 20px; font-size: 16px;">📊 Download Detailed Report</button>
-                <button onclick="migratePointsTo1()" style="background: #8e44ad; padding: 20px; font-size: 16px;">🔄 Migrate Points to 1</button>
-                <button onclick="logout()" style="background: #e74c3c; padding: 20px; font-size: 16px;">Logout</button>
+            <h1>Control Center</h1>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+                <button onclick="showQuestionForm()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">✨ Create Question</button>
+                <button onclick="showSessionControl()" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">🎮 Session Control</button>
+                <button onclick="showEnhancedLeaderboard()" style="background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">🏆 View Leaderboard</button>
+                <button onclick="showQuestionManagement()" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">📚 Question Management</button>
+                <button onclick="showManagerManagement()" style="background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">👥 Manager Management</button>
+                <button onclick="showCategoryManagement()" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">⚙️ Manage Categories</button>
+                <button onclick="downloadDetailedReport()" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">📊 Detailed Report</button>
+                <button onclick="migratePointsTo1()" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">🔄 Migrate Points</button>
+                <button onclick="logout()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 25px; border-radius: 16px; border: none; font-size: 16px; font-weight: 600;">🚪 Logout</button>
             </div>
         </div>
     `;
@@ -551,15 +609,20 @@ async function showQuestionForm() {
             }
             
             .question-header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: rgba(15, 23, 42, 0.85) !important;
+                backdrop-filter: blur(20px) !important;
+                -webkit-backdrop-filter: blur(20px) !important;
                 color: white;
-                padding: 30px;
-                border-radius: 16px 16px 0 0;
-                margin: -40px -40px 0 -40px;
+                padding: 30px 40px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 24px 24px 0 0;
+                margin: -40px -40px 30px -40px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+                position: relative;
+                z-index: 10;
             }
             
             .question-header h1 {
@@ -590,24 +653,27 @@ async function showQuestionForm() {
                 display: flex;
                 gap: 10px;
                 margin: 25px 0 30px 0;
-                border-bottom: 2px solid #e0e0e0;
+                border-bottom: 2px solid rgba(255, 255, 255, 0.1);
             }
             
             .tab {
                 padding: 15px 30px;
-                background: transparent;
-                border: none;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.05);
                 border-bottom: 3px solid transparent;
                 cursor: pointer;
                 font-size: 16px;
                 font-weight: 600;
-                color: #666;
+                color: rgba(255, 255, 255, 0.5);
                 transition: all 0.3s;
+                border-radius: 8px 8px 0 0;
             }
             
             .tab.active {
-                color: #667eea;
-                border-bottom-color: #667eea;
+                color: #9333ea;
+                background: rgba(147, 51, 234, 0.1);
+                border-bottom-color: #9333ea;
+                border-color: rgba(147, 51, 234, 0.3);
             }
             
             .tab:hover {
@@ -636,11 +702,20 @@ async function showQuestionForm() {
             }
             
             .form-card {
-                background: white;
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(20px);
                 border-radius: 16px;
                 padding: 30px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-                border: 1px solid rgba(102, 126, 234, 0.1);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .form-card h3, .form-card h4, .form-card label {
+                color: #ffffff !important;
+            }
+
+            .form-card .form-group label {
+                color: rgba(255, 255, 255, 0.8) !important;
             }
             
             .preview-card {
@@ -662,16 +737,16 @@ async function showQuestionForm() {
             }
             
             .preview-question {
-                background: white;
+                background: rgba(255, 255, 255, 0.03);
                 padding: 25px;
                 border-radius: 12px;
                 margin-top: 20px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 min-height: 200px;
             }
             
             .preview-question h4 {
-                color: #333;
+                color: #ffffff;
                 font-size: 18px;
                 margin: 0 0 20px 0;
             }
@@ -741,15 +816,18 @@ async function showQuestionForm() {
                 display: flex;
                 align-items: center;
                 gap: 10px;
-                padding: 10px;
-                background: #f8f9fa;
+                padding: 12px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 8px;
                 cursor: pointer;
                 transition: all 0.3s;
+                color: white;
             }
             
             .radio-option:hover {
-                background: #e9ecef;
+                background: rgba(255, 255, 255, 0.12);
+                border-color: rgba(147, 51, 234, 0.4);
             }
             
             .radio-option input[type="radio"] {
@@ -758,13 +836,14 @@ async function showQuestionForm() {
             }
             
             .bulk-upload-zone {
-                background: white;
-                border: 3px dashed #667eea;
+                background: rgba(255, 255, 255, 0.03);
+                border: 3px dashed rgba(147, 51, 234, 0.5);
                 border-radius: 16px;
                 padding: 50px;
                 text-align: center;
                 transition: all 0.3s;
                 cursor: pointer;
+                color: white;
             }
             
             .bulk-upload-zone:hover {
@@ -1280,24 +1359,27 @@ async function showSessionControl() {
     root.innerHTML = `
         <div class="container">
             <div class="admin-header">
-                <h1>Session Control</h1>
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <div style="background: #34495e; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold;">
+                <h1 style="font-size: 20px;">Session Control</h1> <!-- Reduced size to prevent overlap -->
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <div style="background: rgba(147, 51, 234, 0.2); color: #c084fc; padding: 8px 12px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid rgba(147, 51, 234, 0.3);">
                         👥 Users: <span id="liveUserCount">0</span>
                     </div>
-                     <div id="liveTimerBadge" style="background: #e74c3c; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold; display: none;">
+                     <div id="liveTimerBadge" style="background: rgba(231, 76, 60, 0.2); color: #ff6b6b; padding: 8px 12px; border-radius: 6px; font-weight: bold; display: none; border: 1px solid rgba(231, 76, 60, 0.3); font-size: 13px;">
                         ⏱️ <span id="liveTimer">00:00:00</span>
                     </div>
-                    <button onclick="stopAdminPolling(); showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
+                    <button onclick="stopAdminPolling(); showAdminDashboard()">← Back</button>
                 </div>
             </div>
             
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <label style="font-weight: 600; margin-right: 10px;">Filter by Category:</label>
-                <select id="categoryFilter" onchange="loadQuestionsForSession()" style="padding: 8px;">
-                    <option value="all">All Categories</option>
-                    ${categoryOptions}
-                </select>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center;">
+                    <label style="font-weight: 600; margin-right: 15px; color: rgba(255, 255, 255, 0.8); font-size: 14px;">Filter by Category:</label>
+                    <select id="categoryFilter" onchange="loadQuestionsForSession()" style="padding: 10px 15px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: white; border-radius: 8px; cursor: pointer; min-width: 220px;">
+                        <option value="all">All Categories</option>
+                        ${categoryOptions}
+                    </select>
+                </div>
+                <div style="color: rgba(255, 255, 255, 0.4); font-size: 12px;">Showing all available questions</div>
             </div>
             
             <div id="questionsList"></div>
@@ -1361,33 +1443,35 @@ async function loadQuestionsForSession() {
             const wasReleased = q.timesLaunched > 0;
 
             return `
-            <div style="background: ${isActive ? '#e8f5e9' : '#f8f9fa'}; padding: 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid ${isActive ? '#27ae60' : wasReleased ? '#f39c12' : 'transparent'};">
+            <div style="background: ${isActive ? 'rgba(39, 174, 96, 0.15)' : 'rgba(255, 255, 255, 0.03)'}; padding: 20px; margin-bottom: 12px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid ${isActive ? '#27ae60' : wasReleased ? 'rgba(243, 156, 18, 0.3)' : 'rgba(255, 255, 255, 0.1)'}; backdrop-filter: blur(10px);">
                 <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0;">
+                    <h3 style="margin: 0 0 10px 0; color: #ffffff; font-size: 18px;">
                         ${q.text}
-                        ${isActive ? ' 🟢 <span style="color: #27ae60; font-size: 14px;">ACTIVE</span>' : ''}
+                        ${isActive ? ' 🟢 <span style="color: #2ecc71; font-size: 12px; vertical-align: middle; border: 1px solid #2ecc71; padding: 2px 6px; border-radius: 4px; margin-left: 10px;">ACTIVE</span>' : ''}
                     </h3>
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <small style="color: #666;">Category: <strong>${q.category || 'General'}</strong></small>
-                        <small style="color: #666;">Type: ${q.type}</small>
-                        <small style="color: #666;">Points: ${q.points}</small>
+                    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                        <small style="color: rgba(255, 255, 255, 0.5);">Category: <strong style="color: #ffffff;">${q.category || 'General'}</strong></small>
+                        <small style="color: rgba(255, 255, 255, 0.5);">Type: <span style="color: #ffffff;">${q.type}</span></small>
+                        <small style="color: rgba(255, 255, 255, 0.5);">Points: <span style="color: #ffffff;">${q.points}</span></small>
                         ${wasReleased ? `<small style="color: #f39c12; font-weight: 600;">📺 Released ${q.timesLaunched}x</small>` : '<small style="color: #27ae60; font-weight: 600;">✨ New</small>'}
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    ${isActive ? `<div style="background: #3498db; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; margin-right: 10px;">📝 Responses: ${session.responseCount || 0}</div>` : ''}
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    ${isActive ? `<div style="background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); padding: 10px 16px; border-radius: 8px; font-weight: 800; margin-right: 8px; font-size: 14px; box-shadow: 0 4px 15px rgba(147, 51, 234, 0.4); display: flex; align-items: center; gap: 8px;"><span>📊</span> Responses: ${session.responseCount || 0}</div>` : ''}
                     
                     <button 
                         onclick="launchQuestion('${q._id}')" 
-                        style="background: ${hasActiveQuestion && !isActive ? '#95a5a6' : '#27ae60'};"
+                        class="admin-btn"
+                        style="background: ${hasActiveQuestion && !isActive ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)'}; border: none; color: ${hasActiveQuestion && !isActive ? 'rgba(255,255,255,0.3)' : 'white'}; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: ${hasActiveQuestion && !isActive ? 'not-allowed' : 'pointer'};"
                         ${hasActiveQuestion && !isActive ? 'disabled' : ''}
                     >Launch</button>
                     <button 
                         onclick="endQuestion()" 
-                        style="background: ${isActive ? '#f39c12' : '#95a5a6'};"
+                        class="admin-btn"
+                        style="background: ${isActive ? 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)' : 'rgba(255,255,255,0.05)'}; border: none; color: ${!isActive ? 'rgba(255,255,255,0.3)' : 'white'}; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: ${!isActive ? 'not-allowed' : 'pointer'};"
                         ${!isActive ? 'disabled' : ''}
                     >End</button>
-                    <button onclick="deleteQuestion('${q._id}', '${q.text.replace(/'/g, "\\'")}')" style="background: #e74c3c;">Delete</button>
+                    <button onclick="deleteQuestion('${q._id}', '${q.text.replace(/'/g, "\\'")}')" class="admin-btn" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); color: #ff6b6b; padding: 10px 18px; border-radius: 8px; font-weight: 600;">Delete</button>
                 </div>
             </div>
         `;
@@ -1869,27 +1953,27 @@ async function showQuestionManagement() {
                 <button onclick="showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
             </div>
             
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end;">
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);">
+                <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 15px; align-items: end;">
                     <div>
-                        <label style="font-weight: 600; display: block; margin-bottom: 5px;">Search Questions</label>
-                        <input type="text" id="searchQuestion" placeholder="Type to search questions..." style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px;">
+                        <label style="font-weight: 600; display: block; margin-bottom: 8px; color: rgba(255, 255, 255, 0.8);">Search Questions</label>
+                        <input type="text" id="searchQuestion" placeholder="Type to search questions..." style="width: 100%; padding: 12px; font-size: 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: white;">
                     </div>
                     <div>
-                        <label style="font-weight: 600; display: block; margin-bottom: 5px;">Category</label>
-                        <select id="filterCategory" onchange="loadAllQuestions()" style="width: 100%; padding: 10px; font-size: 14px;">
-                            <option value="all">All Categories</option>
-                            <option value="General">General</option>
-                            <option value="Sales">Sales</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="Leadership">Leadership</option>
-                            <option value="Technology">Technology</option>
-                            <option value="Product Knowledge">Product Knowledge</option>
-                            <option value="Customer Service">Customer Service</option>
-                            <option value="HR & Compliance">HR & Compliance</option>
+                        <label style="font-weight: 600; display: block; margin-bottom: 8px; color: rgba(255, 255, 255, 0.8);">Category</label>
+                        <select id="filterCategory" onchange="loadAllQuestions()" style="width: 100%; padding: 12px; font-size: 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: white; cursor: pointer;">
+                            <option value="all" style="background: #1a1a3e;">All Categories</option>
+                            <option value="General" style="background: #1a1a3e;">General</option>
+                            <option value="Sales" style="background: #1a1a3e;">Sales</option>
+                            <option value="Marketing" style="background: #1a1a3e;">Marketing</option>
+                            <option value="Leadership" style="background: #1a1a3e;">Leadership</option>
+                            <option value="Technology" style="background: #1a1a3e;">Technology</option>
+                            <option value="Product Knowledge" style="background: #1a1a3e;">Product Knowledge</option>
+                            <option value="Customer Service" style="background: #1a1a3e;">Customer Service</option>
+                            <option value="HR & Compliance" style="background: #1a1a3e;">HR & Compliance</option>
                         </select>
                     </div>
-                    <button onclick="loadAllQuestions()" style="background: #3498db; padding: 10px 20px; width: auto;">Search</button>
+                    <button onclick="loadAllQuestions()" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); padding: 12px 25px; width: auto; font-weight: 600;">Search</button>
                 </div>
             </div>
             
@@ -1943,35 +2027,35 @@ async function loadAllQuestions() {
         }
 
         container.innerHTML = `
-            <div style="background: #f0f1f3; padding: 12px; margin-bottom: 15px; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" style="width: 18px; height: 18px; cursor: pointer;">
-                <label for="selectAll" style="font-weight: 600; cursor: pointer; user-select: none;">Select All (${questions.length} questions)</label>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; margin-bottom: 20px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" style="width: 20px; height: 20px; cursor: pointer;">
+                <label for="selectAll" style="font-weight: 700; cursor: pointer; user-select: none; color: #ffffff; font-size: 15px;">Select All (${questions.length} questions)</label>
             </div>
         ` + questions.map(q => `
-            <div class="question-row" style="background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #667eea; display: flex; gap: 15px; align-items: start;">
+            <div class="question-row" style="background: rgba(255, 255, 255, 0.03); padding: 20px; margin-bottom: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); display: flex; gap: 20px; align-items: start;">
                 <div style="padding-top: 5px;">
                     <input type="checkbox" class="question-checkbox" data-question-id="${q._id}" onchange="updateBulkActionsBar()" style="width: 18px; height: 18px; cursor: pointer;">
                 </div>
                 <div style="flex: 1;">
-                        <h3 style="margin: 0 0 10px 0;">${q.text}</h3>
-                        <div style="display: flex; gap: 15px; margin-bottom: 10px;">
-                            <small style="color: #666;"><strong>Category:</strong> ${q.category || 'General'}</small>
-                            <small style="color: #666;"><strong>Type:</strong> ${q.type}</small>
-                            <small style="color: #666;"><strong>Points:</strong> ${q.points}</small>
-                            <small style="color: #666;"><strong>Times Launched:</strong> ${q.timesLaunched || 0}</small>
+                        <h3 style="margin: 0 0 10px 0; color: #ffffff; font-size: 18px;">${q.text}</h3>
+                        <div style="display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <small style="color: rgba(255, 255, 255, 0.5);"><strong>Category:</strong> <span style="color: #ffffff;">${q.category || 'General'}</span></small>
+                            <small style="color: rgba(255, 255, 255, 0.5);"><strong>Type:</strong> <span style="color: #ffffff;">${q.type}</span></small>
+                            <small style="color: rgba(255, 255, 255, 0.5);"><strong>Points:</strong> <span style="color: #ffffff;">${q.points}</span></small>
+                            <small style="color: rgba(255, 255, 255, 0.5);"><strong>Times Launched:</strong> <span style="color: #ffffff;">${q.timesLaunched || 0}</span></small>
                         </div>
                         ${q.options && q.options.length > 0 ? `
-                            <div style="margin-top: 10px;">
-                                <small style="color: #666;"><strong>Options:</strong></small>
-                                <ul style="margin: 5px 0; padding-left: 20px;">
-                                    ${q.options.map(opt => `<li>${opt} ${q.correctAnswer === opt ? '✓ (Correct)' : ''}</li>`).join('')}
+                            <div style="margin-top: 15px; background: rgba(255, 255, 255, 0.02); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <small style="color: rgba(255, 255, 255, 0.4); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">Options</small>
+                                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: rgba(255, 255, 255, 0.8);">
+                                    ${q.options.map(opt => `<li style="margin-bottom: 5px;">${opt} ${q.correctAnswer === opt ? '<span style="color: #2ecc71; font-weight: 600;">✓ (Correct)</span>' : ''}</li>`).join('')}
                                 </ul>
                             </div>
                         ` : ''}
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="editQuestion('${q._id}')" style="background: #3498db;">Edit</button>
-                        <button onclick="deleteQuestionFromManagement('${q._id}', '${q.text.replace(/'/g, "\\'")}')" style="background: #e74c3c;">Delete</button>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <button onclick="editQuestion('${q._id}')" style="background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); padding: 10px 18px; border-radius: 8px; font-weight: 600;">Edit</button>
+                        <button onclick="deleteQuestionFromManagement('${q._id}', '${q.text.replace(/'/g, "\\'")}')" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); color: #ff6b6b; padding: 10px 18px; border-radius: 8px; font-weight: 600;">Delete</button>
                     </div>
                 </div>
             </div>
@@ -2325,24 +2409,26 @@ async function showManagerManagement() {
                 <button onclick="showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
-                    <h3 style="margin-top: 0;">Add Single Manager</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 25px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);">
+                    <h3 style="margin-top: 0; color: #ffffff; display: flex; align-items: center; gap: 10px;">👤 Add Single Manager</h3>
                     <form id="addManagerForm" style="display: flex; gap: 10px; align-items: end;">
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="managerName">Manager Name</label>
-                            <input type="text" id="managerName" placeholder="Enter manager name" required>
+                            <label for="managerName" style="color: rgba(255, 255, 255, 0.7);">Manager Name</label>
+                            <input type="text" id="managerName" placeholder="Enter manager name" required style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: white;">
                         </div>
-                        <button type="submit" style="background: #27ae60; width: auto;">Add</button>
+                        <button type="submit" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); width: auto; font-weight: 600; padding: 12px 20px;">Add</button>
                     </form>
                 </div>
                 
-                <div style="background: #e3f2fd; padding: 20px; border-radius: 8px;">
-                    <h3 style="margin-top: 0;">Bulk Upload (CSV)</h3>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 25px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);">
+                    <h3 style="margin-top: 0; color: #ffffff; display: flex; align-items: center; gap: 10px;">📤 Bulk Upload (CSV)</h3>
                     <form id="uploadManagersForm">
-                        <input type="file" id="managersCsvFile" accept=".csv" style="margin-bottom: 10px;">
-                        <button type="submit" style="background: #2196f3; width: auto;">Upload CSV</button>
-                        <a href="#" onclick="downloadManagerTemplate(); return false;" style="display: block; margin-top: 10px; font-size: 12px; color: #2196f3;">📥 Download Template</a>
+                        <input type="file" id="managersCsvFile" accept=".csv" style="margin-bottom: 15px; color: rgba(255, 255, 255, 0.6);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <button type="submit" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); width: auto; font-weight: 600; padding: 12px 20px;">Upload CSV</button>
+                            <a href="#" onclick="downloadManagerTemplate(); return false;" style="font-size: 13px; color: #e74c3c; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 5px;"><span>📥</span> Template</a>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -2547,18 +2633,20 @@ async function showCategoryManagement() {
                 <button onclick="showAdminDashboard()" style="background: #95a5a6;">← Back to Dashboard</button>
             </div>
             
-            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="margin-top: 0;">Add New Category</h3>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 25px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 30px; backdrop-filter: blur(10px);">
+                <h3 style="margin-top: 0; color: #ffffff; display: flex; align-items: center; gap: 10px;">🏷️ Add New Category</h3>
                 <form id="addCategoryForm" style="display: flex; gap: 10px; align-items: end;">
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label for="categoryName">Category Name</label>
-                        <input type="text" id="categoryName" placeholder="Enter category name" required>
+                        <label for="categoryName" style="color: rgba(255, 255, 255, 0.7);">Category Name</label>
+                        <input type="text" id="categoryName" placeholder="Enter category name" required style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: white;">
                     </div>
-                    <button type="submit" style="background: #27ae60; width: auto;">Add Category</button>
+                    <button type="submit" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); width: auto; font-weight: 600; padding: 12px 25px;">Add Category</button>
                 </form>
             </div>
             
-            <div id="categoriesList"></div>
+            <div id="categoriesListContainer" style="background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div id="categoriesList"></div>
+            </div>
         </div>
     `;
 
