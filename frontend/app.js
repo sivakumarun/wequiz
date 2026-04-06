@@ -1,7 +1,7 @@
 // API Base URL - automatically switches between local and production
 const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:5001/api'
-    : 'https://wequiz.up.railway.app/api';
+    : 'https://wequiz-production.up.railway.app/api';
 let currentUser = null;
 let currentAdminToken = null;
 let answeredQuestions = new Set(); // Track questions user has answered
